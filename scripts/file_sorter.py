@@ -23,9 +23,9 @@ def main():
     if not os.path.exists(f'{download_folder}extracted/'):
         print(f'Folder: {download_folder}extracted/ not found, creating...')
         os.mkdir(f'{download_folder}extracted/')
-#    # Unzip to 'download_folder/extracted'
-#    subprocess.run(f'tar -xf {download_folder}{download_compressed}\
-#                         -C {download_folder}extracted/')
+    # Unzip to 'download_folder/extracted'
+    subprocess.run(f'tar -xf {download_folder}{download_compressed}\
+                         -C {download_folder}extracted/')
     # Read the 'MANIFEST.txt' file for file information
     file_info = pd.read_table(f'{download_folder}extracted/MANIFEST.txt',
                               low_memory=False)
@@ -64,10 +64,23 @@ from file './data/nationwidechildrens.org_clinical_patient_skcm.txt'
     Stage IIIB
     Stage IIIC
     Stage IV
-2. Move and rename files in 
+2. 8 files for each case:
+First 4 rename with 'submitter_id' + originl name after first '.':
+    '*.wxs.aliquot_ensemble_masked.maf.gz' (unzip then delete .gz)
+    '*.rna_seq.augmented_star_gene_counts.tsv'
+    '*.mirbase21.isoforms.quantification.txt'
+    '*mirbase21.mirnas.quantification.txt'
+Keep these 2:
+    '*.80F131FA-7E24-4210-800F-3E6F442CAB6F.PDF'
+    '*TCGA-D3-A3ML-06A-21-A241-20_RPPA_data.tsv'
+Rename with 'submitter_id' + originl name after second '.':
+    '*.gene_level_copy_number.v36.tsv'
+3. Move and rename files in 
 f'{download_folder}temp_folder/' to the above created folders
 based on json_files 'case_id', 'file_name',
 rename file with: json_cases 'submitter_id' and json_files 'data_category'
+4. search within star_gene_counts.tsv for LINC00094, MIR1270,
+calculate mean value for each stage folder.
 '''
 
 #    # Read json
