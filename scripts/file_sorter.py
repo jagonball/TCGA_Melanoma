@@ -18,8 +18,8 @@ def main():
     project_name = 'TCGA_SKCM'
     output_folder = Path('C:/Repositories/Melanoma_TCGA/analysis/')
     main_data = Path('C:/Repositories/Melanoma_TCGA/data/clinical_patient_skcm.txt')
-    json_files = Path('C:/Repositories/Melanoma_TCGA/data/files.2023-01-06.json')
-    json_cases = Path('C:/Repositories/Melanoma_TCGA/data/cases.2023-01-06.json')
+    json_files = Path('C:/Repositories/Melanoma_TCGA/data/files.2023-01-07.json')
+    json_cases = Path('C:/Repositories/Melanoma_TCGA/data/cases.2023-01-07.json')
     download_folder = Path('C:/Repositories/Melanoma_TCGA/data/0106_test/')
     download_compressed = 'gdc_download_20230106_023217.521073.tar.gz'
 
@@ -80,57 +80,52 @@ def main():
         # Subset main DataFrame with specific stage
         #stage_df = main_df[main_df['ajcc_pathologic_tumor_stage'] == stage]
 
-#    # Read json.
-#    with open(json_files) as file:
-#        files_contents = file.read()
-#    #print(files_contents)
-#    with open(json_cases) as file:
-#        cases_contents = file.read()
-#
-#    # Load json contents into a list of dictionaries.
-#    parsed_json_files = json.loads(files_contents)
-#    #print(parsed_json_files[0:2])#['case_id'])
-#    parsed_json_cases = json.loads(cases_contents)
-#    #print(parsed_json_cases)
-#
-#    files_re_list = ['*.wxs.aliquot_ensemble_masked.maf.gz',
-#                     '*.rna_seq.augmented_star_gene_counts.tsv',
-#                     '*.mirbase21.isoforms.quantification.txt',
-#                     '*.mirbase21.mirnas.quantification.txt']
-#    for name in files_re_list:
-#        target_files_re = str(temp_folder/name)
-#        target_file_list = glob.glob(target_files_re)
-#        print(target_file_list)
-#
-#    for i in target_file_list:
-#        target_file_name = Path(i).name
-#        # Files to keep the name after first ".".
-#        file_id = target_file_name.split('.')[0]
-#        print(file_id)
-#        name_keep = target_file_name.split('.')[1:]
-#        name_keep = '.'.join(name_keep)
-#        print(name_keep)
-#        # Iterate through parsed_json_files for matching file_name.
-#        target_case_id = None
-#        target_submitter_id = None
-#        for i in parsed_json_files:
-#            if i['file_name'] == target_file_name:
-#                #print(i)
-#                if len(i['cases']) != 1:
-#                    print(f'Warning: list "cases" for file '
-#                          f'"{target_file_name}" in "{json_files}" '
-#                          f'are empty or more than one items')
-#                target_case_id = i['cases'][0]['case_id']
-#                #print(target_case_id)
-#                for i in parsed_json_cases:
-#                    if i['case_id'] == target_case_id:
-#                        #print(i)
-#                        target_submitter_id = i['submitter_id']
-#                        #print(target_submitter_id)
-#        # Rename target file if there's match.
-#        if target_submitter_id:
-#            os.rename(temp_folder/target_file_name,
-#                      temp_folder/f'{target_submitter_id}.{name_keep}')
+    # Read json.
+    with open(json_files) as file:
+        files_contents = file.read()
+    #print(files_contents)
+    with open(json_cases) as file:
+        cases_contents = file.read()
+
+    # Load json contents into a list of dictionaries.
+    parsed_json_files = json.loads(files_contents)
+    #print(parsed_json_files[0:2])#['case_id'])
+    parsed_json_cases = json.loads(cases_contents)
+    #print(parsed_json_cases)
+
+    # Files that do not require rename.
+    files_re_list_0 = ['*.PDF',
+                       '*_RPPA_data.tsv']
+    # Files to rename at first '.'.
+    files_re_list_1 = ['*.wxs.aliquot_ensemble_masked.maf.gz',
+                       '*.rna_seq.augmented_star_gene_counts.tsv',
+                       '*.mirbase21.isoforms.quantification.txt',
+                       '*.mirbase21.mirnas.quantification.txt']
+    # Files to rename at second '.'.
+    files_re_list_2 = ['*.gene_level_copy_number.v36.tsv']
+
+
+    # Create a list to store target files' path.
+    target_files_list_0 = search_target_files(files_re_list_0, temp_folder)
+    print(f'Numbers of files found that do not require rename: '
+          f'{len(target_files_list_0)}')
+    target_files_list_1 = search_target_files(files_re_list_1, temp_folder)
+    print(f'Numbers of files found to rename at first ".": '
+          f'{len(target_files_list_1)}')
+    #print(target_files_list_1)
+    target_files_list_2 = search_target_files(files_re_list_2, temp_folder)
+    print(f'Numbers of files found to rename at second ".": '
+          f'{len(target_files_list_2)}')
+    rename_target_files(target_files_list_1, temp_folder, json_files,
+                        files_json = parsed_json_files,
+                        cases_json = parsed_json_cases,
+                        delimiter = '.', id_pos = 0, name_pos = 1)
+    rename_target_files(target_files_list_2, temp_folder, json_files,
+                        files_json = parsed_json_files,
+                        cases_json = parsed_json_cases,
+                        delimiter = '.', id_pos = 1, name_pos = 2)
+
+    
     
 
 
@@ -160,6 +155,55 @@ def replace_special_chars(str):
     return mod_str
 
 
+def search_target_files(file_list, folder_path):
+        """Search files matching "file_list" in "folder_path".
+
+        :param file_list: a list of files. (accept regular expression)
+        :type file_list: list
+        :param folder_path: The folder path to search for.
+        :type folder_path: Path or str
+        :return: A list of target files.
+        :rtype: list
+        """
+        target_files_list = []
+        for name in file_list:
+            target_files = str(folder_path/name)
+            target_files_list += glob.glob(target_files)
+        return target_files_list
+
+
+def rename_target_files(files_list, folder_path, json_files,
+                        files_json, cases_json,
+                        delimiter = '.', id_pos = 0, name_pos = 1):
+        for i in files_list:
+            target_file_name = Path(i).name
+            # Files to keep the name after first ".".
+            file_id = target_file_name.split(delimiter)[id_pos]
+            #print(file_id)
+            name_keep = target_file_name.split(delimiter)[name_pos:]
+            name_keep = delimiter.join(name_keep)
+            #print(name_keep)
+            # Iterate through files_json for matching file_name.
+            target_case_id = None
+            target_submitter_id = None
+            for i in files_json:
+                if i['file_name'] == target_file_name:
+                    #print(i)
+                    if len(i['cases']) != 1:
+                        print(f'Warning: list "cases" for file '
+                              f'"{target_file_name}" in "{json_files}" '
+                              f'are empty or more than one items')
+                    target_case_id = i['cases'][0]['case_id']
+                    #print(target_case_id)
+                    for i in cases_json:
+                        if i['case_id'] == target_case_id:
+                            #print(i)
+                            target_submitter_id = i['submitter_id']
+                            #print(target_submitter_id)
+            # Rename target file if there's match.
+            if target_submitter_id:
+                os.rename(folder_path/target_file_name,
+                          folder_path/f'{target_submitter_id}.{name_keep}')
 
 
 '''
