@@ -1,5 +1,5 @@
 '''
-To sort files downloaded from TCGA
+To sort files downloaded from TCGA, based on tumor stage and case barcode.
 customized for project TCGA-SKCM
 at https://portal.gdc.cancer.gov/projects/TCGA-SKCM
 '''
@@ -7,92 +7,20 @@ import os
 import subprocess
 import re
 from pathlib import Path
-import glob
+from glob import glob
 import pandas as pd
 import numpy as np
 import shutil
 import json
 
 def main():
-    ### input parameters ###
+    ### Input parameters. ###
     project_name = 'TCGA_SKCM'
     output_folder = Path('C:/Repositories/Melanoma_TCGA/analysis/')
-    main_data = Path('C:/Repositories/Melanoma_TCGA/data/clinical_patient_skcm.txt')
     json_files = Path('C:/Repositories/Melanoma_TCGA/data/files.2023-01-07.json')
     json_cases = Path('C:/Repositories/Melanoma_TCGA/data/cases.2023-01-07.json')
     download_folder = Path('C:/Repositories/Melanoma_TCGA/data/0106_test/')
     download_compressed = 'gdc_download_20230106_023217.521073.tar.gz'
-
-
-    ### Create project folder if not already exist
-    project_name = replace_special_chars(project_name)
-    project_folder = create_folder(project_name, output_folder)
-
-
-    ### Unzip downloaded file ###
-    # Create 'extracted' folder if not already exist.
-    extracted_folder = create_folder('extracted', download_folder)
-    #if not os.path.exists(f'{download_folder}extracted/'):
-    #    print(f'Folder: {download_folder}extracted/ not found, creating...')
-    #    os.mkdir(f'{download_folder}extracted/')
-    # Unzip compressed file to extracted_folder
-    print(f'## Extracting the compressed file to {extracted_folder}...')
-    compressed_file = download_folder / download_compressed
-    subprocess.run(['tar', '-xf', compressed_file, '-C', extracted_folder])
-    # Read the 'MANIFEST.txt' file for file information
-    file_info = pd.read_table(extracted_folder/'MANIFEST.txt',
-                              low_memory=False)
-    #print(file_info)
-    # Filter for state 'validated', to ignore the 'annotations.txt'
-    file_info = file_info[file_info['state'] == 'validated']
-    #print(file_info)
-    ## Move the files into 'temp_folder'
-    # Create 'temp_folder' folder if not already exist.
-    temp_folder = create_folder('temp_folder', download_folder)
-    #if not os.path.exists(f'{download_folder}temp_folder/'):
-    #    print(f'Folder: {download_folder}temp_folder/ not found, creating...')
-    #    os.mkdir(f'{download_folder}temp_folder/')
-    print(f'## Moving the extracted files to {temp_folder}...')
-    for file in file_info['filename']:
-        #print(file)
-        file_name = file.split('/')[-1]
-        #print(file_name)
-        shutil.move(extracted_folder/file,
-                    temp_folder/file_name)
-
-
-    ### Read main_data into DataFrame
-    main_df = pd.read_table(main_data, sep = '\t', header = [0, 1, 2])
-    #print(main_df['ajcc_pathologic_tumor_stage'])
-    ## Select tumor stage column, squeeze into Series,
-    ## then reorder the unique stage values.
-    unique_stages = np.sort(main_df['ajcc_pathologic_tumor_stage']\
-                            .squeeze().unique())
-    print(f'Unique stages: {unique_stages}')
-    ## Create a folder for each tumor stage,
-    ## then for each patient create folder with bcr_patient_barcode
-    for stage in unique_stages:
-        #print(stage)
-        # Check if the stage folder exist, if not, create one.
-        stage = replace_special_chars(stage)
-        #print(stage)
-        stage_folder = create_folder(stage, project_folder)
-        # Subset main DataFrame with specific stage
-        #stage_df = main_df[main_df['ajcc_pathologic_tumor_stage'] == stage]
-
-    # Read json.
-    with open(json_files) as file:
-        files_contents = file.read()
-    #print(files_contents)
-    with open(json_cases) as file:
-        cases_contents = file.read()
-
-    # Load json contents into a list of dictionaries.
-    parsed_json_files = json.loads(files_contents)
-    #print(parsed_json_files[0:2])#['case_id'])
-    parsed_json_cases = json.loads(cases_contents)
-    #print(parsed_json_cases)
-
     # Files that do not require rename.
     files_re_list_0 = ['*.PDF',
                        '*_RPPA_data.tsv']
@@ -103,9 +31,47 @@ def main():
                        '*.mirbase21.mirnas.quantification.txt']
     # Files to rename at second '.'.
     files_re_list_2 = ['*.gene_level_copy_number.v36.tsv']
+    # Main data with all cases' information.
+    main_data = Path('C:/Repositories/Melanoma_TCGA/data/clinical_patient_skcm.txt')
+    stage_colname = 'ajcc_pathologic_tumor_stage'
+    barcode_colname = 'bcr_patient_barcode'
 
 
-    # Create a list to store target files' path.
+    ### Create project folder if not already exist. ###
+    project_name = replace_special_chars(project_name)
+    project_folder = create_folder(project_name, output_folder,
+                                   verbose = True)
+
+
+    ### Unzip downloaded file. ###
+    # Create 'extracted' folder if not already exist.
+    extracted_folder = create_folder('extracted', download_folder,
+                                      verbose = True)
+    # Unzip compressed file to extracted_folder.
+    print(f'## Extracting "{download_compressed}" into {extracted_folder}...')
+    compressed_file = download_folder / download_compressed
+    subprocess.run(['tar', '-xf', compressed_file, '-C', extracted_folder])
+
+
+    ### Move the extracted files to temp_folder. ###
+    # Read the 'MANIFEST.txt' file for file information.
+    file_info = pd.read_table(extracted_folder/'MANIFEST.txt',
+                              low_memory=False)
+    #print(file_info)
+    # Filter for state 'validated', to ignore the 'annotations.txt'.
+    file_info = file_info[file_info['state'] == 'validated']
+    #print(file_info)
+    # Create 'temp_folder' folder if not already exist.
+    temp_folder = create_folder('temp_folder', download_folder,
+                                 verbose=True)
+    print(f'## Moving the extracted files to {temp_folder}...')
+    move_files_in_list(file_info['filename'], extracted_folder, temp_folder)
+    # Remove extracted_folder.
+    print(f'## Move completed, deleting folder {extracted_folder}...')
+    shutil.rmtree(extracted_folder) #, ignore_errors=True)
+
+
+    ### Create a list to store target files' path. ###
     target_files_list_0 = search_target_files(files_re_list_0, temp_folder)
     print(f'Numbers of files found that do not require rename: '
           f'{len(target_files_list_0)}')
@@ -116,6 +82,14 @@ def main():
     target_files_list_2 = search_target_files(files_re_list_2, temp_folder)
     print(f'Numbers of files found to rename at second ".": '
           f'{len(target_files_list_2)}')
+
+
+    ### Rename files with case id. ###
+    # Read json files.
+    parsed_json_files = read_json(json_files)
+    #print(parsed_json_files[0:2])
+    parsed_json_cases = read_json(json_cases)
+    # Rename files.
     rename_target_files(target_files_list_1, temp_folder, json_files,
                         files_json = parsed_json_files,
                         cases_json = parsed_json_cases,
@@ -125,85 +99,180 @@ def main():
                         cases_json = parsed_json_cases,
                         delimiter = '.', id_pos = 1, name_pos = 2)
 
-    
-    
+
+    ### Create folders based on tumor stage and case barcode, ###
+    ### then move the renamed files from "temp_folder" into ###
+    ### the corresponding folder. ###
+    # Read main_data into DataFrame.
+    main_df = pd.read_table(main_data, sep = '\t',
+                            header = 0, skiprows = [1,2])
+    #print(main_df.head())
+    # Select tumor stage column, then reorder the unique stage values.
+    unique_stages = np.sort(main_df[stage_colname].unique())
+    print(f'Unique stages: {unique_stages}')
+    ## Create a folder for each tumor stage,
+    ## then for each patient create folder with bcr_patient_barcode.
+    for stage in unique_stages:
+        print(f'Working on: {stage}')
+        # Check if the stage folder exist, if not, create one.
+        stage_mod = replace_special_chars(stage)
+        #print(stage_mod)
+        stage_folder = create_folder(stage_mod, project_folder)
+        # Subset main DataFrame with specific stage.
+        stage_df = main_df[main_df[stage_colname] == stage]
+        # Iterate "bcr_patient_barcode" to create and move files.
+        for barcode in stage_df[barcode_colname]:
+            #print(barcode)
+            # Create case folder with barcode within "stage_folder".
+            case_folder = create_folder(barcode, stage_folder)
+            ## Move files from temp_folder to case_folder.
+            case_list = [f'{barcode}*']
+            case_files = search_target_files(case_list, temp_folder)
+            #print(f'Found "{len(case_files)}" files for case "{barcode}"')
+            move_files_in_list(case_files, temp_folder, case_folder)
+            
+    ## Remove temp_folder.
+    #print(f'## Move completed, deleting folder {temp_folder}...')
+    #shutil.rmtree(temp_folder) #, ignore_errors=True)
 
 
-
-
-def create_folder(folder_name, output_folder):
+def create_folder(folder_name, path_to_folder, verbose = False):
     """Create folder if not already exist.
 
     :param folder_name: The folder name.
     :type folder_name: str
-    :param output_folder: The path to check for the folder.
-    :type output_folder: str
+    :param path_to_folder: The path to check for the folder.
+    :type path_to_folder: str
     :return: The full path to inside the folder.
     :rtype: str
     """
-    final_folder = output_folder / folder_name
-    print(f'Checking if folder "{folder_name}" exists...')
-    if folder_name not in os.listdir(output_folder):
-        print(f'## Folder "{folder_name}" not found, creating...')
+    final_folder = path_to_folder / folder_name
+    if verbose:
+        print(f'Checking if folder "{folder_name}" '
+              f'exists in "{path_to_folder}"...')
+    if folder_name not in os.listdir(path_to_folder):
+        if verbose:
+            print(f'## Folder "{folder_name}" not found, creating...')
         os.mkdir(final_folder)    
     return final_folder
 
 
 def replace_special_chars(str):
+    """Replace special characters with "_".
+
+    :param str: Input string.
+    :type str: str
+    :return: Output string.
+    :rtype: str
+    """
     mod_str = re.sub('[^a-zA-Z0-9 \n\.]', '_', str)
     mod_str = mod_str.replace(" ", "_")
     return mod_str
 
 
-def search_target_files(file_list, folder_path):
-        """Search files matching "file_list" in "folder_path".
+def move_files_in_list(files_list, from_folder, to_folder):
+    """Move files in the list or Series, from "from_folder" to "to_folder".
+    
+    :param files_list: A list or Series of file names.
+    :type files_list: list or Series
+    :param from_folder: The original folder path.
+    :type from_folder: Path
+    :param to_folder: The destination folder path.
+    :type to_folder: Path
+    """
+    for file in files_list:
+        #print(file)
+        file_name = Path(file).name
+        #print(f'file_name: {file_name}')
+        shutil.move(from_folder/file,
+                    to_folder/file_name)
 
-        :param file_list: a list of files. (accept regular expression)
-        :type file_list: list
-        :param folder_path: The folder path to search for.
-        :type folder_path: Path or str
-        :return: A list of target files.
-        :rtype: list
-        """
-        target_files_list = []
-        for name in file_list:
-            target_files = str(folder_path/name)
-            target_files_list += glob.glob(target_files)
-        return target_files_list
+
+def read_json(json_file):
+    """Read json into a list of dictionaries.
+
+    :param json: Path to json file.
+    :type json: Path or str
+    :return: Parsed json contents.
+    :rtype: list
+    """
+    with open(json_file) as file:
+        contents = file.read()
+    parsed_json = json.loads(contents)
+    return parsed_json
+
+
+def search_target_files(file_list, folder_path):
+    """Search files matching "file_list" in "folder_path".
+
+    :param file_list: a list of files. (accept regular expression)
+    :type file_list: list
+    :param folder_path: The folder path to search for.
+    :type folder_path: Path or str
+    :return: A list of target files.
+    :rtype: list
+    """
+    target_files_list = []
+    for name in file_list:
+        target_files = str(folder_path/name)
+        target_files_list += glob(target_files)
+    return target_files_list
 
 
 def rename_target_files(files_list, folder_path, json_files,
                         files_json, cases_json,
                         delimiter = '.', id_pos = 0, name_pos = 1):
-        for i in files_list:
-            target_file_name = Path(i).name
-            # Files to keep the name after first ".".
-            file_id = target_file_name.split(delimiter)[id_pos]
-            #print(file_id)
-            name_keep = target_file_name.split(delimiter)[name_pos:]
-            name_keep = delimiter.join(name_keep)
-            #print(name_keep)
-            # Iterate through files_json for matching file_name.
-            target_case_id = None
-            target_submitter_id = None
-            for i in files_json:
-                if i['file_name'] == target_file_name:
-                    #print(i)
-                    if len(i['cases']) != 1:
-                        print(f'Warning: list "cases" for file '
-                              f'"{target_file_name}" in "{json_files}" '
-                              f'are empty or more than one items')
-                    target_case_id = i['cases'][0]['case_id']
-                    #print(target_case_id)
-                    for i in cases_json:
-                        if i['case_id'] == target_case_id:
-                            #print(i)
-                            target_submitter_id = i['submitter_id']
-                            #print(target_submitter_id)
-            # Rename target file if there's match.
-            if target_submitter_id:
-                os.rename(folder_path/target_file_name,
-                          folder_path/f'{target_submitter_id}.{name_keep}')
+    """Rename files in "files_list" within "folder_path", 
+    based on information of two json files.
+
+    :param files_list: A list of file names, accept regular expression.
+    :type files_list: list
+    :param folder_path: Folder path of the files.
+    :type folder_path: Path or str
+    :param json_files: File path of json files.
+    :type json_files: Path or str
+    :param files_json: Parsed files json.
+    :type files_json: list
+    :param cases_json: Parsed cases json.
+    :type cases_json: list
+    :param delimiter: Delimiter of file name, defaults to '.'
+    :type delimiter: str, optional
+    :param id_pos: Position of "ID" of the specified delimiter, defaults to 0
+    :type id_pos: int, optional
+    :param name_pos: Position of "Name to keep" of the specified delimiter, defaults to 1
+    :type name_pos: int, optional
+    """
+    for i in files_list:
+        target_file_name = Path(i).name
+        # Files to keep the name after first ".".
+        file_id = target_file_name.split(delimiter)[id_pos]
+        #print(file_id)
+        name_keep = target_file_name.split(delimiter)[name_pos:]
+        name_keep = delimiter.join(name_keep)
+        #print(name_keep)
+        # Iterate files_json for matching file_name.
+        target_case_id = None
+        target_submitter_id = None
+        for i in files_json:
+            if i['file_name'] == target_file_name:
+                #print(i)
+                if len(i['cases']) != 1:
+                    print(f'Warning: list "cases" for file '
+                          f'"{target_file_name}" in "{json_files}" '
+                          f'are empty or more than one items')
+                target_case_id = i['cases'][0]['case_id']
+                #print(target_case_id)
+                for i in cases_json:
+                    if i['case_id'] == target_case_id:
+                        #print(i)
+                        target_submitter_id = i['submitter_id']
+                        #print(target_submitter_id)
+        # Rename target file if there's match.
+        if target_submitter_id:
+            old_name = folder_path/target_file_name
+            new_name = folder_path/f'{target_submitter_id}.{name_keep}'
+            if not new_name.exists():
+                os.rename(old_name, new_name)
 
 
 '''
