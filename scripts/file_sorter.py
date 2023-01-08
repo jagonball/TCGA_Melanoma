@@ -21,10 +21,6 @@ Keep these 2:
 Rename with 'submitter_id' + originl name after second '.':
 # Data Type: Gene Level Copy Number
     '*.gene_level_copy_number.v36.tsv'
-
-To do list:
-1. search within star_gene_counts.tsv for LINC00094, MIR1270,
-calculate mean value for each stage folder.
 '''
 import os
 import sys
@@ -74,7 +70,7 @@ def main():
                                    verbose = True)
 
 
-    ### Managing downloaded file. ###
+    ### Manage downloaded file(s). ###
     # Create "extracted" folder if not already exist.
     extracted_folder = create_folder('extracted', download_folder,
                                       verbose = True)
@@ -99,18 +95,30 @@ def main():
         move_files_in_list(download_list, download_folder, extracted_folder)
 
 
+    ### Manage extracted files. ###
     # Read the "manifest_file" for file information.
     file_info = pd.read_table(extracted_folder / manifest_file,
                               low_memory=False)
     #print(file_info)
-    # Filter for state 'validated', to ignore the 'annotations.txt'.
-    file_info = file_info[file_info['state'] == 'validated']
-    #print(file_info)
     # Create 'temp_folder' folder if not already exist.
     temp_folder = create_folder('temp_folder', download_folder,
                                  verbose=True)
-    print(f'## Moving the extracted files to "{temp_folder}"...')
-    move_files_in_list(file_info['filename'], extracted_folder, temp_folder)
+    # Move the files we need to temp_folder.
+    if download_is_tar_gz:
+        # Filter for state 'validated', to ignore the 'annotations.txt'.
+        file_info = file_info[file_info['state'] == 'validated']
+        #print(file_info)
+        print(f'## Moving the extracted files to "{temp_folder}"...')
+        move_files_in_list(file_info['filename'], extracted_folder, temp_folder)
+    else:
+        # Concat folder name with file name.
+        file_info['folder_file'] = file_info['id'] + '/' + file_info['filename']
+        #print(file_info['folder_file'])
+        print(f'## Moving the files to "{temp_folder}"...')
+        move_files_in_list(file_info['folder_file'], extracted_folder, temp_folder)
+    # Move manifest_file to download_folder.
+    shutil.move(extracted_folder / manifest_file,
+                download_folder / manifest_file)
     # Remove extracted_folder.
     print(f'## Move completed, deleting folder "{extracted_folder}"...')
     shutil.rmtree(extracted_folder) #, ignore_errors=True)
@@ -127,13 +135,22 @@ def main():
     target_files_list_2 = search_target_files(files_re_list_2, temp_folder)
     print(f'Numbers of files found to rename at second ".": '
           f'{len(target_files_list_2)}')
+    ## Save file list to file.
+    #dict = {'files': target_files_list_1}
+    #df = pd.DataFrame(dict)
+    #df.to_csv('./analysis/files_list_1.txt', sep = '\t', index = False)
+    #dict = {'files': target_files_list_2}
+    #df = pd.DataFrame(dict)
+    #df.to_csv('./analysis/files_list_2.txt', sep = '\t', index = False)
 
 
     ### Rename files with case id. ###
     # Read json files.
     parsed_json_files = read_json(json_files)
+    print(f'Number of files in files.json: {len(parsed_json_files)}')
     #print(parsed_json_files[0:2])
     parsed_json_cases = read_json(json_cases)
+    print(f'Number of cases cases.json: {len(parsed_json_cases)}')
     # Rename files.
     rename_target_files(target_files_list_1, temp_folder, json_files,
                         files_json = parsed_json_files,
@@ -143,6 +160,18 @@ def main():
                         files_json = parsed_json_files,
                         cases_json = parsed_json_cases,
                         delimiter = '.', id_pos = 1, name_pos = 2)
+
+
+    ### Decompress all .gz files. ###
+    find_gz = str(temp_folder / '*.gz')
+    gz_list = glob(find_gz)
+    #print(gz_list)
+    print(f'Number of .gz files: {len(gz_list)}')
+    print(f'## Decompressing all ".gz" files...')
+    for gz in gz_list:
+        subprocess.run(['gzip', '-d', gz])
+    #all_gz = ' '.join(gz_list)
+    #subprocess.run(['gzip', '-d', all_gz])
 
 
     ### Create folders based on tumor stage and case barcode, ###
@@ -198,7 +227,7 @@ def create_folder(folder_name, path_to_folder, verbose = False):
     if folder_name not in os.listdir(path_to_folder):
         if verbose:
             print(f'## Folder "{folder_name}" not found, creating...')
-        os.mkdir(final_folder)    
+        os.mkdir(final_folder) 
     return final_folder
 
 
@@ -312,28 +341,41 @@ def rename_target_files(files_list, folder_path, json_files,
         name_keep = delimiter.join(name_keep)
         #print(name_keep)
         # Iterate files_json for matching file_name.
-        target_case_id = None
-        target_submitter_id = None
-        for i in files_json:
-            if i['file_name'] == target_file_name:
-                #print(i)
-                if len(i['cases']) != 1:
-                    print(f'Warning: list "cases" for file '
-                          f'"{target_file_name}" in "{json_files}" '
-                          f'are empty or more than one items')
-                target_case_id = i['cases'][0]['case_id']
-                #print(target_case_id)
-                for i in cases_json:
-                    if i['case_id'] == target_case_id:
-                        #print(i)
-                        target_submitter_id = i['submitter_id']
-                        #print(target_submitter_id)
+        target_case_id = next((dict['cases'][0]['case_id']\
+                               for dict in files_json\
+                               if dict['file_name'] == target_file_name),
+                              None)
+        target_submitter_id = next((dict['submitter_id']\
+                                    for dict in cases_json\
+                                    if dict['case_id'] == target_case_id),
+                                   None)
+    #    # Iterate files_json for matching file_name.
+    #    target_case_id = None
+    #    target_submitter_id = None
+    #    for i in files_json:
+    #        if i['file_name'] == target_file_name:
+    #            #print(i)
+    #            if len(i['cases']) != 1:
+    #                print(f'Warning: list "cases" for file '
+    #                      f'"{target_file_name}" in "{json_files}" '
+    #                      f'are empty or more than one items')
+    #            target_case_id = i['cases'][0]['case_id']
+    #            #print(target_case_id)
+    #            for i in cases_json:
+    #                if i['case_id'] == target_case_id:
+    #                    #print(i)
+    #                    target_submitter_id = i['submitter_id']
+    #                    #print(target_submitter_id)
         # Rename target file if there's match.
         if target_submitter_id:
             old_name = folder_path / target_file_name
-            new_name = folder_path/f'{target_submitter_id}.{name_keep}'
+            new_name = folder_path / f'{target_submitter_id}.{name_keep}'
             if not new_name.exists():
                 os.rename(old_name, new_name)
+            else:
+                print(f'Warning: Duplicate file name found for "{new_name}"')
+        else:
+            print(f'Error: Match not found for file "{i}"')
 
 
 if __name__ == '__main__':
