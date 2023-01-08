@@ -2,8 +2,32 @@
 To sort files downloaded from TCGA, based on tumor stage and case barcode.
 customized for project TCGA-SKCM
 at https://portal.gdc.cancer.gov/projects/TCGA-SKCM
+
+Download 7 types of files:
+First 4 rename with 'submitter_id' + originl name after first '.':
+# Data Type: Masked Somatic Mutation
+    '*.wxs.aliquot_ensemble_masked.maf.gz' (unzip then delete .gz)
+# Data Type: Gene Expression Quantification
+    '*.rna_seq.augmented_star_gene_counts.tsv'
+# Data Type: Isoform Expression Quantification
+    '*.mirbase21.isoforms.quantification.txt'
+# Data Type: miRNA Expression Quantification
+    '*.mirbase21.mirnas.quantification.txt'
+Keep these 2:
+# Data Type: Pathology Report
+    '*.PDF'
+# Data Type: Protein Expression Quantification
+    '*_RPPA_data.tsv'
+Rename with 'submitter_id' + originl name after second '.':
+# Data Type: Gene Level Copy Number
+    '*.gene_level_copy_number.v36.tsv'
+
+To do list:
+1. search within star_gene_counts.tsv for LINC00094, MIR1270,
+calculate mean value for each stage folder.
 '''
 import os
+import sys
 import subprocess
 import re
 from pathlib import Path
@@ -19,8 +43,15 @@ def main():
     output_folder = Path('C:/Repositories/Melanoma_TCGA/analysis/')
     json_files = Path('C:/Repositories/Melanoma_TCGA/data/files.2023-01-07.json')
     json_cases = Path('C:/Repositories/Melanoma_TCGA/data/cases.2023-01-07.json')
-    download_folder = Path('C:/Repositories/Melanoma_TCGA/data/0106_test/')
+    # Download data is ".tar.gz" or with manifest and folders.
+    download_is_tar_gz = False
+    ## !!! Warning: download_folder must only contain
+    ## either downloaded ".tar.gz" file
+    ## or manifest file plus folders downloaded with the manifest.
+    ## Other files will be deleted by this code.
+    download_folder = Path('C:/Repositories/Melanoma_TCGA/data/0107_all/')
     download_compressed = 'gdc_download_20230106_023217.521073.tar.gz'
+    manifest_file = 'gdc_manifest_20230107_155741.txt'
     # Files that do not require rename.
     files_re_list_0 = ['*.PDF',
                        '*_RPPA_data.tsv']
@@ -43,19 +74,33 @@ def main():
                                    verbose = True)
 
 
-    ### Unzip downloaded file. ###
-    # Create 'extracted' folder if not already exist.
+    ### Managing downloaded file. ###
+    # Create "extracted" folder if not already exist.
     extracted_folder = create_folder('extracted', download_folder,
                                       verbose = True)
-    # Unzip compressed file to extracted_folder.
-    print(f'## Extracting "{download_compressed}" into {extracted_folder}...')
-    compressed_file = download_folder / download_compressed
-    subprocess.run(['tar', '-xf', compressed_file, '-C', extracted_folder])
+    # Unzip downloaded ".tar.gz"
+    if download_is_tar_gz:
+        file_check(download_compressed, 'compressed file', download_folder)
+        # Unzip compressed file to extracted_folder.
+        print(f'## Extracting "{download_compressed}" into "{extracted_folder}"...')
+        compressed_file = download_folder / download_compressed
+        subprocess.run(['tar', '-xf', compressed_file, '-C', extracted_folder])
+        # Set the "manifest_file" name.
+        manifest_file = 'MANIFEST.txt'
+    # Move the manifest file and folders to "extracted" folder.
+    else:
+        download_list = os.listdir(download_folder)
+        file_check(manifest_file, 'manifest file', download_folder)
+        # Remove "extracted" from download_list if exists.
+        if 'extracted' in download_list:
+            download_list.remove('extracted')
+        #print(len(download_list))
+        print(f'## Moving the downloaded files to "{extracted_folder}"...')
+        move_files_in_list(download_list, download_folder, extracted_folder)
 
 
-    ### Move the extracted files to temp_folder. ###
-    # Read the 'MANIFEST.txt' file for file information.
-    file_info = pd.read_table(extracted_folder/'MANIFEST.txt',
+    # Read the "manifest_file" for file information.
+    file_info = pd.read_table(extracted_folder / manifest_file,
                               low_memory=False)
     #print(file_info)
     # Filter for state 'validated', to ignore the 'annotations.txt'.
@@ -64,10 +109,10 @@ def main():
     # Create 'temp_folder' folder if not already exist.
     temp_folder = create_folder('temp_folder', download_folder,
                                  verbose=True)
-    print(f'## Moving the extracted files to {temp_folder}...')
+    print(f'## Moving the extracted files to "{temp_folder}"...')
     move_files_in_list(file_info['filename'], extracted_folder, temp_folder)
     # Remove extracted_folder.
-    print(f'## Move completed, deleting folder {extracted_folder}...')
+    print(f'## Move completed, deleting folder "{extracted_folder}"...')
     shutil.rmtree(extracted_folder) #, ignore_errors=True)
 
 
@@ -184,8 +229,24 @@ def move_files_in_list(files_list, from_folder, to_folder):
         #print(file)
         file_name = Path(file).name
         #print(f'file_name: {file_name}')
-        shutil.move(from_folder/file,
-                    to_folder/file_name)
+        shutil.move(from_folder / file,
+                    to_folder / file_name)
+
+
+def file_check(file, file_type, folder):
+    """Check if file is in folder.
+
+    :param file: The file name.
+    :type file: str
+    :param file_type: The type of file.
+    :type file_type: str
+    :param folder: The folder to look for.
+    :type folder: Path or str
+    """
+    if file not in os.listdir(folder):
+        print(f'Error: Cannot find the {file_type} '
+              f'"{file}", please check again.')
+        sys.exit()
 
 
 def read_json(json_file):
@@ -214,7 +275,7 @@ def search_target_files(file_list, folder_path):
     """
     target_files_list = []
     for name in file_list:
-        target_files = str(folder_path/name)
+        target_files = str(folder_path / name)
         target_files_list += glob(target_files)
     return target_files_list
 
@@ -269,58 +330,10 @@ def rename_target_files(files_list, folder_path, json_files,
                         #print(target_submitter_id)
         # Rename target file if there's match.
         if target_submitter_id:
-            old_name = folder_path/target_file_name
+            old_name = folder_path / target_file_name
             new_name = folder_path/f'{target_submitter_id}.{name_keep}'
             if not new_name.exists():
                 os.rename(old_name, new_name)
-
-
-'''
-To do list:
-1. Create folders based on tumor stage information
-from file './data/clinical_patient_skcm.txt'
-    [Not Available]
-    I/II NOS
-    Stage 0
-    Stage I
-    Stage IA
-    Stage IB
-    Stage II
-    Stage IIA
-    Stage IIB
-    Stage IIC
-    Stage III
-    Stage IIIA
-    Stage IIIB
-    Stage IIIC
-    Stage IV
-2. 7 files for each case:
-First 4 rename with 'submitter_id' + originl name after first '.':
-    # Data Type: Masked Somatic Mutation
-    '*.wxs.aliquot_ensemble_masked.maf.gz' (unzip then delete .gz)
-    # Data Type: Gene Expression Quantification
-    '*.rna_seq.augmented_star_gene_counts.tsv'
-    # Data Type: Isoform Expression Quantification
-    '*.mirbase21.isoforms.quantification.txt'
-    # Data Type: miRNA Expression Quantification
-    '*.mirbase21.mirnas.quantification.txt'
-Keep these 2:
-    # Data Type: Pathology Report
-    '*.80F131FA-7E24-4210-800F-3E6F442CAB6F.PDF'
-    # Data Type: Protein Expression Quantification
-    '*TCGA-D3-A3ML-06A-21-A241-20_RPPA_data.tsv'
-Rename with 'submitter_id' + originl name after second '.':
-    # Data Type: Gene Level Copy Number
-    '*.gene_level_copy_number.v36.tsv'
-3. Move and rename files in 
-f'{download_folder}temp_folder/' to the above created folders
-based on json_files 'case_id', 'file_name',
-rename file with: json_cases 'submitter_id' and json_files 'data_category'
-4. search within star_gene_counts.tsv for LINC00094, MIR1270,
-calculate mean value for each stage folder.
-'''
-
-
 
 
 if __name__ == '__main__':
