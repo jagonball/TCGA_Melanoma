@@ -114,7 +114,7 @@ def main():
         # Concat folder name with file name.
         file_info['folder_file'] = file_info['id'] + '/' + file_info['filename']
         #print(file_info['folder_file'])
-        print(f'## Moving the files to "{temp_folder}"...')
+        print(f'## Moving files to "{temp_folder}"...')
         move_files_in_list(file_info['folder_file'], extracted_folder, temp_folder)
     # Move manifest_file to download_folder.
     shutil.move(extracted_folder / manifest_file,
@@ -147,10 +147,10 @@ def main():
     ### Rename files with case id. ###
     # Read json files.
     parsed_json_files = read_json(json_files)
-    print(f'Number of files in files.json: {len(parsed_json_files)}')
+    print(f'Number of files in "files.json": {len(parsed_json_files)}')
     #print(parsed_json_files[0:2])
     parsed_json_cases = read_json(json_cases)
-    print(f'Number of cases cases.json: {len(parsed_json_cases)}')
+    print(f'Number of cases "cases.json": {len(parsed_json_cases)}')
     # Rename files.
     rename_target_files(target_files_list_1, temp_folder, json_files,
                         files_json = parsed_json_files,
@@ -205,9 +205,12 @@ def main():
             #print(f'Found "{len(case_files)}" files for case "{barcode}"')
             move_files_in_list(case_files, temp_folder, case_folder)
             
-    ## Remove temp_folder.
-    #print(f'## Move completed, deleting folder {temp_folder}...')
-    #shutil.rmtree(temp_folder) #, ignore_errors=True)
+    # Remove temp_folder if all files are moved.
+    if glob(str(temp_folder / '*')) == []:
+        print(f'## Move completed, deleting folder "{temp_folder}"...')
+        shutil.rmtree(temp_folder) #, ignore_errors=True)
+    else:
+        print(f'Warning: Move incomplete, please check folder "{temp_folder}"')
 
 
 def create_folder(folder_name, path_to_folder, verbose = False):
@@ -239,8 +242,8 @@ def replace_special_chars(str):
     :return: Output string.
     :rtype: str
     """
-    mod_str = re.sub('[^a-zA-Z0-9 \n\.]', '_', str)
-    mod_str = mod_str.replace(" ", "_")
+    mod_str = re.sub('[^a-zA-Z0-9\n\.]', '_', str)
+    #mod_str = mod_str.replace(" ", "_")
     return mod_str
 
 
@@ -309,6 +312,7 @@ def search_target_files(file_list, folder_path):
     return target_files_list
 
 
+# Potential problem with more than 1 suffixes. e.g. "*.tar.gz"
 def rename_target_files(files_list, folder_path, json_files,
                         files_json, cases_json,
                         delimiter = '.', id_pos = 0, name_pos = 1):
@@ -370,10 +374,18 @@ def rename_target_files(files_list, folder_path, json_files,
         if target_submitter_id:
             old_name = folder_path / target_file_name
             new_name = folder_path / f'{target_submitter_id}.{name_keep}'
-            if not new_name.exists():
-                os.rename(old_name, new_name)
+            #if not new_name.exists():
+            #    os.rename(old_name, new_name)
+            dupe_count = 1
+            while new_name.exists():
+                dupe_count += 1
+                print(f'Attention: File name "{new_name}" already exists, '
+                      f'attempting rename...')
+                file_name = new_name.stem + f'_{dupe_count}' + new_name.suffix
+                new_name = folder_path / file_name
+                #print(new_name)
             else:
-                print(f'Warning: Duplicate file name found for "{new_name}"')
+                os.rename(old_name, new_name)
         else:
             print(f'Error: Match not found for file "{i}"')
 
