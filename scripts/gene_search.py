@@ -52,51 +52,51 @@ def main():
     # Get target files list. 
     for file_re in files_re_list:
         print(f'Searching "{file_re}"...')
-#        # Path for glob search.
-#        search_path = project_folder / '*' / '*' / file_re
-#        # List of matching files in project folder.
-#        files_list = glob(str(search_path))
-#        print(f'"{len(files_list)}" matching files found for "{search_path}"')
-#        # Turn all "path" into "stage/case_id".
-#        case_folder_list = [Path(f).parents[1].name + '/' +\
-#                            Path(f).parents[0].name\
-#                            for f in files_list]
-#        #print(len(case_folder_list))
-#        # Count the occurances of folder name.
-#        folder_count = pd.Series(case_folder_list).value_counts()
-#        target_folder = folder_count[folder_count > 1].index
-#        #print(target_folder)
-#
-#
-#        # Iterate "target_folder" for files.
-#        files_removed = []  # A list to store removed duplicate file path.
-#        for folder in target_folder:
-#            #print(folder)
-#            # Path for glob search.
-#            target_path = project_folder / folder / file_re
-#            dupe_files = glob(str(target_path))
-#            file_num = 0    # Give a number to each file.
-#            file_compare = {}   # Dictionary for file compare.
-#            for file in dupe_files:
-#                df = pd.read_table(file, usecols = columns_to_check,
-#                                   index_col = 0, skiprows = 1, nrows = 4)
-#                #print(df)
-#                #print(df.iloc[0, 0])
-#                # Add file_num and value to dictionary for comparison.
-#                file_compare[file_num] = df.iloc[0, 0]
-#                file_num += 1
-#            #print(file_compare)
-#            # Find the "key"(s) other than the smallest value.
-#            file_num_drop = [k for k in file_compare\
-#                             if file_compare[k] != min(file_compare.values())]
-#            #print(file_num_drop)
-#            # Remove file(s) to drop from files_list.
-#            for f in file_num_drop:
-#                # Add file path to files_removed.
-#                files_removed.append(dupe_files[f])
-#                print(f'Removing duplicate file from list: "{dupe_files[f]}"')
-#                files_list.remove(dupe_files[f])
-#                #print(len(files_list))
+        # Path for glob search.
+        search_path = project_folder / '*' / '*' / file_re
+        # List of matching files in project folder.
+        files_list = glob(str(search_path))
+        print(f'"{len(files_list)}" matching files found for "{search_path}"')
+        # Turn all "path" into "stage/case_id".
+        case_folder_list = [Path(f).parents[1].name + '/' +\
+                            Path(f).parents[0].name\
+                            for f in files_list]
+        #print(len(case_folder_list))
+        # Count the occurances of folder name.
+        folder_count = pd.Series(case_folder_list).value_counts()
+        target_folder = folder_count[folder_count > 1].index
+        #print(target_folder)
+
+
+        # Iterate "target_folder" for files.
+        files_removed = []  # A list to store removed duplicate file path.
+        for folder in target_folder:
+            #print(folder)
+            # Path for glob search.
+            target_path = project_folder / folder / file_re
+            dupe_files = glob(str(target_path))
+            file_num = 0    # Give a number to each file.
+            file_compare = {}   # Dictionary for file compare.
+            for file in dupe_files:
+                df = pd.read_table(file, usecols = columns_to_check,
+                                   index_col = 0, skiprows = 1, nrows = 4)
+                #print(df)
+                #print(df.iloc[0, 0])
+                # Add file_num and value to dictionary for comparison.
+                file_compare[file_num] = df.iloc[0, 0]
+                file_num += 1
+            #print(file_compare)
+            # Find the "key"(s) other than the smallest value.
+            file_num_drop = [k for k in file_compare\
+                             if file_compare[k] != min(file_compare.values())]
+            #print(file_num_drop)
+            # Remove file(s) to drop from files_list.
+            for f in file_num_drop:
+                # Add file path to files_removed.
+                files_removed.append(dupe_files[f])
+                print(f'Removing duplicate file from list: "{dupe_files[f]}"')
+                files_list.remove(dupe_files[f])
+                #print(len(files_list))
         
 
         # Find target_gene within files in files_list.
@@ -106,29 +106,29 @@ def main():
             gene_name = replace_special_chars(gene)
             gene_folder = create_folder(gene_name, analysis_folder,
                                            verbose = True)
-#            print(f'Performing gene search for: "{gene}"...')
-#            df_gene = gene_search(files_list, gene = gene,
-#                                  usecols = columns_we_want,
-#                                  index_col = 0, skiprows = 1)
-#            print(df_gene.shape)
-#
-#            # Annotate T, M, N stage information.
-#            df_gene = df_gene.set_index('case_id')
-#            print(df_gene.shape)
-#            #print(df_gene.head(-5))
-#            df_gene = pd.concat([df_gene, df_main], axis=1, join='inner')
-#            print(df_gene.shape)
-#
-#            ### Save to files. ###
-#            # Removed files.
-#            print(f'Writing file: "{gene_folder}/files_removed.txt"...')
-#            with open(f'{gene_folder}/files_removed.txt', 'w') as f:
-#                f.write(f'>Duplicate files removed for "{file_re}"\n')
-#                for line in files_removed:
-#                    f.write(f'{line}\n')
-#            # Gene dataframe.
-#            print(f'Writing file: "{gene_folder}/{gene}.txt"...')
-#            df_gene.to_csv(f'{gene_folder}/{gene}.txt', sep = '\t')
+            print(f'Performing gene search for: "{gene}"...')
+            df_gene = gene_search(files_list, gene = gene,
+                                  usecols = columns_we_want,
+                                  index_col = 0, skiprows = 1)
+            print(df_gene.shape)
+
+            # Annotate T, M, N stage information.
+            df_gene = df_gene.set_index('case_id')
+            print(df_gene.shape)
+            #print(df_gene.head(-5))
+            df_gene = pd.concat([df_gene, df_main], axis=1, join='inner')
+            print(df_gene.shape)
+
+            ### Save to files. ###
+            # Removed files.
+            print(f'Writing file: "{gene_folder}/files_removed.txt"...')
+            with open(f'{gene_folder}/files_removed.txt', 'w') as f:
+                f.write(f'>Duplicate files removed for "{file_re}"\n')
+                for line in files_removed:
+                    f.write(f'{line}\n')
+            # Gene dataframe.
+            print(f'Writing file: "{gene_folder}/{gene}.txt"...')
+            df_gene.to_csv(f'{gene_folder}/{gene}.txt', sep = '\t')
 
 
             ## Load file to skip the above gene search. ##
@@ -257,15 +257,15 @@ def main():
             else:
                 print(f'No "0" found for {gene}')
 
-    #        # Generate histogram for each column.
-    #        # Set plot style
-    #        plt.style.use('ggplot')
-    #        for column in columns_we_want[1:4]:
-    #            print(f'Histogram for "df_gene" column: "{column}"')
-    #            histogram(df_gene, column, gene_folder, '')
-    #        for column in columns_we_want[1:4]:
-    #            print(f'Histogram for "df_gene_rm0" column: "{column}"')
-    #            histogram(df_gene_rm0, column, gene_folder, '_rm0')
+            # Generate histogram for each column.
+            # Set plot style
+            plt.style.use('ggplot')
+            for column in columns_we_want[1:4]:
+                print(f'Histogram for "df_gene" column: "{column}"')
+                histogram(df_gene, column, gene_folder, '')
+            for column in columns_we_want[1:4]:
+                print(f'Histogram for "df_gene_rm0" column: "{column}"')
+                histogram(df_gene_rm0, column, gene_folder, '_rm0')
     
 
             ### Merge the same stage. ###

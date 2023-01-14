@@ -22,7 +22,7 @@ def main():
     # The columns we want.
     columns_main = ['bcr_patient_barcode', 'vital_status', 
                     'last_contact_days_to', 'death_days_to']
-    gene_file = gene_folder / 'BRD3OS.txt'
+    gene_file = gene_folder / 'merge_BRD3OS.txt'
 
     ### Create survival folder if not already exist. ###
     survival_folder = create_folder('survival', gene_folder,
@@ -87,10 +87,50 @@ def main():
     new_df = pd.concat([new_df, df_gene], axis=1, join='inner')
     # Drop the unwanted columns.
     new_df = new_df.drop(columns=['tpm_unstranded', 'fpkm_unstranded',
-                                  'fpkm_uq_unstranded', 'tumor_stage',
+                                  'fpkm_uq_unstranded', #'tumor_stage',
                                   'stage_T', 'stage_N', 'stage_M'])
     print(new_df.shape)
     #print(new_df.head(-5))
+    # Dictionary for stage rename.
+    tumor_stage = {'Stage_0': 0,
+                   'Stage_I': 1,
+                   'Stage_II': 2,
+                   'Stage_III': 3,
+                   'Stage_IV': 4,
+                   '_Not_Available_': np.nan,
+                   'I_II_NOS': np.nan}
+    # All stages: '[Not Available]', 'T0', 'T1~4', 'Tis', 'TX'.
+    stage_T = {'T0': 0,
+               'T1': 1,
+               'T2': 2,
+               'T3': 3,
+               'T4': 4,
+               '[Not Available]': np.nan,
+               'TX': np.nan,
+               'Tis': np.nan}
+
+    # All stages: '[Not Available]', 'N0', 'N1~3', 'NX'.
+    stage_N = {'N0': 0,
+               'N1': 1,
+               'N2': 2,
+               'N3': 3,
+               '[Not Available]': np.nan,
+               'NX': np.nan}
+
+    # All stages: '[Not Available]', 'M0', 'M1'.
+    stage_M = {'M0': 0,
+               'M1': 1,
+               '[Not Available]': np.nan}
+
+    new_df['tumor_stage'] = new_df['tumor_stage'].replace(tumor_stage)
+    #new_df['stage_T'] = new_df['stage_T'].replace(stage_T)
+    #new_df['stage_N'] = new_df['stage_N'].replace(stage_N)
+    #new_df['stage_M'] = new_df['stage_M'].replace(stage_M)
+    #print(new_df.head(-5))
+    new_df = new_df.dropna()
+    print(new_df.shape)
+    #print(new_df.head(-5))
+
     # Save file to check.
     #new_df.to_csv(survival_folder / 'new_df_final.txt',
     #              sep = '\t')
@@ -101,7 +141,6 @@ def main():
     print(new_df['vital_status'].dtype)
     print(new_df['days'].dtype)
     print(new_df['BRD3OS'].dtype)
-
 
     ### Perform CoxPHFitter. ###
     cph = CoxPHFitter()
