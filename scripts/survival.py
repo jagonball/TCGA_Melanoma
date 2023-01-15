@@ -65,20 +65,37 @@ def main():
                           index_col = 0)
     print(df_gene.shape)
     #print(df_gene.head())
-    # Calculate mean and standard deviation, then setup a cutoff value.
-    #gene_mean = df_gene['tpm_unstranded'].mean()
-    #gene_std = df_gene['tpm_unstranded'].std()
-    #cutoff = gene_mean + gene_std
+
+    # Create a new column with expression value.
+    df_gene['BRD3OS'] = df_gene['tpm_unstranded'].copy()
+
+
+    ### Set a cutoff value, then create column based on cutoff. ###
+    # Set cutoff with mean and standard deviation.
+    gene_mean = df_gene['tpm_unstranded'].mean()
+    gene_std = df_gene['tpm_unstranded'].std()
+    cutoff = gene_mean + gene_std
+    ## Create new column with cutoff value.
+    ## if >= cutoff, vlaue = 1; otherwise value = 0.
+    df_gene['BRD3OS_mean+std'] = np.where(df_gene['tpm_unstranded'] >= cutoff, 1, 0)
+
     # Use quantile to set cutoff.
     set_quantile = 0.9
-    gene_quantile = df_gene.quantile(set_quantile)
-    cutoff = gene_quantile[0]
-    print(f'cutoff is set to: {cutoff}')
-    # Create new column with cutoff value.
-    # if >= cutoff, vlaue = 1; otherwise value = 0.
-    df_gene['BRD3OS'] = np.where(df_gene['tpm_unstranded'] >= cutoff, 1, 0)
-    #df_gene['BRD3OS'] = df_gene['tpm_unstranded'].copy()
-    #print(df_gene.head(-5))
+    cutoff = df_gene['tpm_unstranded'].quantile(set_quantile)
+    df_gene['BRD3OS_90'] = np.where(df_gene['tpm_unstranded'] >= cutoff, 1, 0)
+
+    set_quantile = 0.75
+    cutoff = df_gene['tpm_unstranded'].quantile(set_quantile)
+    df_gene['BRD3OS_75'] = np.where(df_gene['tpm_unstranded'] >= cutoff, 1, 0)
+
+    set_quantile = 0.5
+    cutoff = df_gene['tpm_unstranded'].quantile(set_quantile)
+    df_gene['BRD3OS_50'] = np.where(df_gene['tpm_unstranded'] >= cutoff, 1, 0)
+
+    set_quantile = 0.25
+    cutoff = df_gene['tpm_unstranded'].quantile(set_quantile)
+    df_gene['BRD3OS_25'] = np.where(df_gene['tpm_unstranded'] >= cutoff, 1, 0)
+
     # Save file to check.
     #df_gene.to_csv(survival_folder / 'BRD3OS_cutoff.txt',
     #               sep = '\t')
@@ -87,10 +104,11 @@ def main():
     new_df = pd.concat([new_df, df_gene], axis=1, join='inner')
     # Drop the unwanted columns.
     new_df = new_df.drop(columns=['tpm_unstranded', 'fpkm_unstranded',
-                                  'fpkm_uq_unstranded', #'tumor_stage',
-                                  'stage_T', 'stage_N', 'stage_M'])
+                                  'fpkm_uq_unstranded', 'tumor_stage',
+                                  'stage_T', 'stage_N']) #'stage_M', 
     print(new_df.shape)
     #print(new_df.head(-5))
+
     # Dictionary for stage rename.
     tumor_stage = {'Stage_0': 0,
                    'Stage_I': 1,
@@ -99,6 +117,7 @@ def main():
                    'Stage_IV': 4,
                    '_Not_Available_': np.nan,
                    'I_II_NOS': np.nan}
+
     # All stages: '[Not Available]', 'T0', 'T1~4', 'Tis', 'TX'.
     stage_T = {'T0': 0,
                'T1': 1,
@@ -122,13 +141,13 @@ def main():
                'M1': 1,
                '[Not Available]': np.nan}
 
-    new_df['tumor_stage'] = new_df['tumor_stage'].replace(tumor_stage)
+    # Stage rename then dropna.
+    #new_df['tumor_stage'] = new_df['tumor_stage'].replace(tumor_stage)
     #new_df['stage_T'] = new_df['stage_T'].replace(stage_T)
     #new_df['stage_N'] = new_df['stage_N'].replace(stage_N)
-    #new_df['stage_M'] = new_df['stage_M'].replace(stage_M)
-    #print(new_df.head(-5))
+    new_df['stage_M'] = new_df['stage_M'].replace(stage_M)
     new_df = new_df.dropna()
-    print(new_df.shape)
+    #print(new_df.shape)
     #print(new_df.head(-5))
 
     # Save file to check.
