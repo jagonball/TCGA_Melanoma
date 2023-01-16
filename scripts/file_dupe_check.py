@@ -2,13 +2,14 @@
 To check the "duplicate" files.
 Copy the "duplicate" files into folder "dupe_files_check".
 '''
-
 import os
 import shutil
 from pathlib import Path
 from glob import glob
 from file_sorter import create_folder, read_json, search_target_files
 
+__author__ = "Johnathan Lin <jagonball@gmail.com>"
+__email__ = "jagonball@gmail.com"
 
 def main():
     ### Input parameters. ###

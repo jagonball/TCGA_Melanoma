@@ -8,6 +8,8 @@ import numpy as np
 from lifelines import CoxPHFitter
 from file_sorter import create_folder
 
+__author__ = "Johnathan Lin <jagonball@gmail.com>"
+__email__ = "jagonball@gmail.com"
 
 def main():
     ### Input parameters. ###

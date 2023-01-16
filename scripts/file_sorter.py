@@ -33,6 +33,9 @@ import numpy as np
 import shutil
 import json
 
+__author__ = "Johnathan Lin <jagonball@gmail.com>"
+__email__ = "jagonball@gmail.com"
+
 def main():
     ### Input parameters. ###
     project_name = 'TCGA_SKCM'

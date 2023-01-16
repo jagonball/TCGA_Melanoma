@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from file_sorter import create_folder, replace_special_chars
 
+__author__ = "Johnathan Lin <jagonball@gmail.com>"
+__email__ = "jagonball@gmail.com"
 
 def main():
     ### Input parameters. ###
